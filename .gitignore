@@ -1,0 +1,21 @@
+.DS_Store
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Datos locales de prueba / expedientes del cliente
+doc_aux/
+
+# Build del ejecutable
+build/
+dist/
+*.spec
+
+# Temporales de Excel
+~$*.xls
+~$*.xlsx
+~$*.xlsm
+
+# Logs locales
+*.log
