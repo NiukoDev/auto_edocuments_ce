@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from tkinter import BooleanVar, Button, Checkbutton, Entry, Frame, Label, OptionMenu, StringVar, Text, Tk, filedialog, messagebox
+from tkinter import BooleanVar, Button, Canvas, Checkbutton, OptionMenu, StringVar, Tk, filedialog, messagebox
 
 from config import APP_NAME, DATA_SHEET_NAME, MONTHS
 from excel_service import ExcelValidationError, analyze_data_file, generate_result_file, inspect_output_file
@@ -25,6 +25,7 @@ class AuditorApp(Tk):
             "blue": "#2563eb",
             "accent": "#0891b2",
             "neutral": "#1f2937",
+            "border": "#334155",
         }
 
         self.title(APP_NAME)
@@ -40,54 +41,79 @@ class AuditorApp(Tk):
         self.year_var = StringVar(value=str(datetime.now().year))
         self.overwrite_var = BooleanVar(value=False)
         self.analysis: AnalysisResult | None = None
+        self.log_lines: list[str] = []
+
+        self.path_text_items: dict[str, int] = {}
+        self.output_label_item: int | None = None
+        self.log_text_item: int | None = None
 
         self._build_layout()
         self._update_output_label()
-        self.after(50, self._first_render)
+        self._log("Listo. Selecciona el DATA mensual, resultado y carpeta de expedientes.")
 
     def _build_layout(self) -> None:
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1)
+        self.canvas = Canvas(self, bg=self.colors["bg"], highlightthickness=0)
+        self.canvas.pack(fill="both", expand=True)
 
-        root = Frame(self, bg=self.colors["bg"], padx=26, pady=26)
-        root.grid(row=0, column=0, sticky="nsew")
-        root.grid_columnconfigure(0, weight=2)
-        root.grid_columnconfigure(1, weight=1)
-        root.grid_rowconfigure(1, weight=1)
+        self._draw_background()
+        self._draw_texts()
+        self._create_controls()
 
-        header = Frame(root, bg=self.colors["bg"])
-        header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 16))
-        header.grid_columnconfigure(0, weight=1)
-        Label(header, text="Auditor de Expedientes", bg=self.colors["bg"], fg=self.colors["text"], font=("Helvetica", 30, "bold"), anchor="w").grid(row=0, column=0, sticky="ew")
-        Label(header, text="Genera DS acumulada y hojas mensuales estrictas desde el DATA oficial.", bg=self.colors["bg"], fg=self.colors["muted"], font=("Helvetica", 14), anchor="w").grid(row=1, column=0, sticky="ew", pady=(3, 0))
+    def _draw_background(self) -> None:
+        c = self.canvas
+        c.create_rectangle(0, 0, 1080, 720, fill=self.colors["bg"], outline="")
+        c.create_rectangle(40, 116, 704, 660, fill=self.colors["card"], outline=self.colors["border"], width=1)
+        c.create_rectangle(728, 116, 1040, 660, fill=self.colors["card"], outline=self.colors["border"], width=1)
+        c.create_rectangle(68, 500, 676, 590, fill=self.colors["panel"], outline=self.colors["border"], width=1)
+        c.create_rectangle(756, 174, 1012, 632, fill=self.colors["field"], outline=self.colors["border"], width=1)
 
-        form = Frame(root, bg=self.colors["card"], padx=18, pady=18)
-        form.grid(row=1, column=0, sticky="nsew", padx=(0, 12))
-        form.grid_columnconfigure(1, weight=1)
+    def _draw_texts(self) -> None:
+        c = self.canvas
+        c.create_text(40, 36, text="Auditor de Expedientes", fill=self.colors["text"], font=("Helvetica", 30, "bold"), anchor="nw")
+        c.create_text(42, 78, text="Genera DS acumulada y hojas mensuales estrictas desde el DATA oficial.", fill=self.colors["muted"], font=("Helvetica", 14), anchor="nw")
 
-        self._label(form, "Modo").grid(row=0, column=0, sticky="w", pady=(0, 8))
-        mode = OptionMenu(form, self.mode_var, "Crear archivo nuevo", "Actualizar archivo existente", command=lambda _value: self._update_output_label())
+        c.create_text(68, 144, text="Modo de operacion", fill=self.colors["label"], font=("Helvetica", 13, "bold"), anchor="nw")
+        c.create_text(68, 214, text="Archivo DATA mensual", fill=self.colors["label"], font=("Helvetica", 13, "bold"), anchor="nw")
+        self.output_label_item = c.create_text(68, 294, text="Guardar resultado como", fill=self.colors["label"], font=("Helvetica", 13, "bold"), anchor="nw")
+        c.create_text(68, 374, text="Carpeta de expedientes", fill=self.colors["label"], font=("Helvetica", 13, "bold"), anchor="nw")
+        c.create_text(68, 454, text="Mes", fill=self.colors["label"], font=("Helvetica", 13, "bold"), anchor="nw")
+        c.create_text(348, 454, text="Año", fill=self.colors["label"], font=("Helvetica", 13, "bold"), anchor="nw")
+
+        c.create_text(90, 520, text=f'El DATA debe contener una hoja llamada exactamente "{DATA_SHEET_NAME}".', fill=self.colors["cyan"], font=("Helvetica", 13, "bold"), anchor="nw")
+        c.create_text(90, 548, text="Columnas obligatorias: Patente, Pedimento, SeccionAduanera, TipoOperacion, ClaveDocumento, FechaPagoReal.", fill=self.colors["label"], font=("Helvetica", 12), anchor="nw", width=560)
+
+        c.create_text(756, 144, text="Estado", fill=self.colors["text"], font=("Helvetica", 20, "bold"), anchor="nw")
+        self.log_text_item = c.create_text(776, 194, text="", fill="#dbeafe", font=("Menlo", 12), anchor="nw", width=216)
+
+        self.path_text_items["data"] = self._path_box(68, 244, "Sin DATA seleccionado")
+        self.path_text_items["output"] = self._path_box(68, 324, "Sin resultado seleccionado")
+        self.path_text_items["folder"] = self._path_box(68, 404, "Sin carpeta seleccionada")
+
+    def _path_box(self, x: int, y: int, text: str) -> int:
+        self.canvas.create_rectangle(x, y, x + 410, y + 34, fill=self.colors["field"], outline=self.colors["border"], width=1)
+        return self.canvas.create_text(x + 12, y + 9, text=text, fill=self.colors["muted"], font=("Helvetica", 11), anchor="nw", width=386)
+
+    def _create_controls(self) -> None:
+        mode = OptionMenu(self.canvas, self.mode_var, "Crear archivo nuevo", "Actualizar archivo existente", command=lambda _value: self._update_output_label())
         self._style_option_menu(mode)
-        mode.grid(row=0, column=1, columnspan=2, sticky="ew", padx=(10, 0), pady=(0, 8))
+        self.canvas.create_window(250, 154, window=mode, width=330, height=38, anchor="nw")
 
-        self._add_file_row(form, 1, "DATA mensual", self.data_path_var, self._select_data_file, "Seleccionar DATA")
+        self.canvas.create_window(504, 242, window=self._button("Seleccionar DATA", self._select_data_file, self.colors["neutral"]), width=160, height=38, anchor="nw")
+        self.output_button = self._button("Elegir ruta", self._select_output_file, self.colors["neutral"])
+        self.canvas.create_window(504, 322, window=self.output_button, width=160, height=38, anchor="nw")
+        self.canvas.create_window(504, 402, window=self._button("Seleccionar carpeta", self._select_folder, self.colors["neutral"]), width=160, height=38, anchor="nw")
 
-        self.output_label = self._label(form, "Resultado")
-        self.output_label.grid(row=2, column=0, sticky="w", pady=8)
-        self._entry(form, self.output_path_var).grid(row=2, column=1, sticky="ew", padx=(10, 10), pady=8)
-        self.output_button = self._button(form, "Seleccionar", self._select_output_file, self.colors["neutral"])
-        self.output_button.grid(row=2, column=2, sticky="ew", pady=8)
-
-        self._add_file_row(form, 3, "Carpeta expedientes", self.folder_path_var, self._select_folder, "Seleccionar carpeta")
-
-        self._label(form, "Mes").grid(row=4, column=0, sticky="w", pady=8)
-        month = OptionMenu(form, self.month_var, *MONTHS)
+        month = OptionMenu(self.canvas, self.month_var, *MONTHS)
         self._style_option_menu(month)
-        month.grid(row=4, column=1, sticky="ew", padx=(10, 10), pady=8)
-        self._entry(form, self.year_var).grid(row=4, column=2, sticky="ew", pady=8)
+        self.canvas.create_window(68, 478, window=month, width=230, height=38, anchor="nw")
 
-        Checkbutton(
-            form,
+        years = [str(datetime.now().year + offset) for offset in range(-2, 4)]
+        year = OptionMenu(self.canvas, self.year_var, *years)
+        self._style_option_menu(year)
+        self.canvas.create_window(348, 478, window=year, width=130, height=38, anchor="nw")
+
+        rewrite = Checkbutton(
+            self.canvas,
             text="Permitir reescribir el mes con confirmacion",
             variable=self.overwrite_var,
             bg=self.colors["card"],
@@ -96,68 +122,70 @@ class AuditorApp(Tk):
             activeforeground=self.colors["cyan"],
             selectcolor=self.colors["field"],
             font=("Helvetica", 12),
-        ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(14, 12))
+        )
+        self.canvas.create_window(68, 610, window=rewrite, anchor="nw")
 
-        instructions = Frame(form, bg=self.colors["panel"], padx=14, pady=14)
-        instructions.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(4, 14))
-        instructions.grid_columnconfigure(0, weight=1)
-        Label(instructions, text=f'El DATA debe contener una hoja llamada exactamente "{DATA_SHEET_NAME}".', bg=self.colors["panel"], fg=self.colors["cyan"], font=("Helvetica", 13, "bold"), anchor="w").grid(row=0, column=0, sticky="ew")
-        Label(instructions, text="Columnas obligatorias: Patente, Pedimento, SeccionAduanera, TipoOperacion, ClaveDocumento, FechaPagoReal.", bg=self.colors["panel"], fg=self.colors["label"], font=("Helvetica", 12), anchor="w", justify="left", wraplength=590).grid(row=1, column=0, sticky="ew", pady=(6, 0))
+        self.canvas.create_window(68, 676, window=self._button("Analizar", self._analyze, self.colors["blue"]), width=290, height=42, anchor="sw")
+        self.canvas.create_window(386, 676, window=self._button("Generar Auditoria", self._generate, self.colors["accent"]), width=290, height=42, anchor="sw")
 
-        buttons = Frame(form, bg=self.colors["card"])
-        buttons.grid(row=7, column=0, columnspan=3, sticky="ew")
-        buttons.grid_columnconfigure(0, weight=1)
-        buttons.grid_columnconfigure(1, weight=1)
-        self._button(buttons, "Analizar", self._analyze, self.colors["blue"]).grid(row=0, column=0, sticky="ew", padx=(0, 8))
-        self._button(buttons, "Generar Auditoria", self._generate, self.colors["accent"]).grid(row=0, column=1, sticky="ew", padx=(8, 0))
-
-        side = Frame(root, bg=self.colors["card"], padx=18, pady=18)
-        side.grid(row=1, column=1, sticky="nsew", padx=(12, 0))
-        side.grid_columnconfigure(0, weight=1)
-        side.grid_rowconfigure(1, weight=1)
-        Label(side, text="Estado", bg=self.colors["card"], fg=self.colors["text"], font=("Helvetica", 20, "bold"), anchor="w").grid(row=0, column=0, sticky="ew", pady=(0, 12))
-        self.log_box = Text(side, bg=self.colors["field"], fg="#dbeafe", insertbackground="#dbeafe", relief="flat", wrap="word", font=("Menlo", 12), padx=12, pady=12)
-        self.log_box.grid(row=1, column=0, sticky="nsew")
-        self._log("Listo. Selecciona el DATA mensual, resultado y carpeta de expedientes.")
-
-    def _label(self, parent, text: str) -> Label:
-        return Label(parent, text=text, bg=self.colors["card"], fg=self.colors["label"], font=("Helvetica", 13, "bold"), anchor="w")
-
-    def _entry(self, parent, variable: StringVar) -> Entry:
-        return Entry(parent, textvariable=variable, bg=self.colors["field"], fg=self.colors["text"], insertbackground=self.colors["text"], relief="flat", highlightthickness=1, highlightbackground="#334155", highlightcolor=self.colors["cyan"], font=("Helvetica", 12))
-
-    def _button(self, parent, text: str, command, bg: str) -> Button:
-        return Button(parent, text=text, command=command, bg=bg, fg="#ffffff", activebackground=bg, activeforeground="#ffffff", relief="flat", padx=14, pady=9, font=("Helvetica", 12, "bold"), cursor="hand2")
+    def _button(self, text: str, command, bg: str) -> Button:
+        return Button(
+            self.canvas,
+            text=text,
+            command=command,
+            bg=bg,
+            fg="#ffffff",
+            activebackground=bg,
+            activeforeground="#ffffff",
+            relief="flat",
+            padx=14,
+            pady=8,
+            font=("Helvetica", 12, "bold"),
+            cursor="hand2",
+        )
 
     def _style_option_menu(self, widget: OptionMenu) -> None:
-        widget.configure(bg=self.colors["field"], fg=self.colors["text"], activebackground=self.colors["neutral"], activeforeground=self.colors["text"], relief="flat", highlightthickness=1, highlightbackground="#334155", font=("Helvetica", 12))
+        widget.configure(
+            bg=self.colors["field"],
+            fg=self.colors["text"],
+            activebackground=self.colors["neutral"],
+            activeforeground=self.colors["text"],
+            relief="flat",
+            highlightthickness=1,
+            highlightbackground=self.colors["border"],
+            font=("Helvetica", 12, "bold"),
+        )
         widget["menu"].configure(bg=self.colors["field"], fg=self.colors["text"], activebackground=self.colors["neutral"])
-
-    def _add_file_row(self, parent, row: int, label: str, variable: StringVar, command, button_text: str) -> None:
-        self._label(parent, label).grid(row=row, column=0, sticky="w", pady=8)
-        self._entry(parent, variable).grid(row=row, column=1, sticky="ew", padx=(10, 10), pady=8)
-        self._button(parent, button_text, command, self.colors["neutral"]).grid(row=row, column=2, sticky="ew", pady=8)
 
     def _first_render(self) -> None:
         self.update_idletasks()
         self.lift()
 
+    def _set_path_text(self, key: str, value: str) -> None:
+        display = value if len(value) <= 58 else "..." + value[-55:]
+        self.canvas.itemconfigure(self.path_text_items[key], text=display, fill=self.colors["text"])
+
     def _update_output_label(self) -> None:
-        if not hasattr(self, "output_label"):
+        if self.output_label_item is None:
             return
         if self.mode_var.get() == "Crear archivo nuevo":
-            self.output_label.configure(text="Guardar resultado como")
+            self.canvas.itemconfigure(self.output_label_item, text="Guardar resultado como")
             self.output_button.configure(text="Elegir ruta")
+            placeholder = "Sin resultado seleccionado"
         else:
-            self.output_label.configure(text="Resultado existente")
+            self.canvas.itemconfigure(self.output_label_item, text="Resultado existente")
             self.output_button.configure(text="Seleccionar resultado")
+            placeholder = "Sin resultado existente seleccionado"
         self.output_path_var.set("")
         self.analysis = None
+        if "output" in self.path_text_items:
+            self.canvas.itemconfigure(self.path_text_items["output"], text=placeholder, fill=self.colors["muted"])
 
     def _select_data_file(self) -> None:
         path = filedialog.askopenfilename(title="Selecciona DATA mensual", filetypes=[("Excel", "*.xlsx *.xlsm")])
         if path:
             self.data_path_var.set(path)
+            self._set_path_text("data", path)
             self.analysis = None
 
     def _select_output_file(self) -> None:
@@ -167,11 +195,13 @@ class AuditorApp(Tk):
             path = filedialog.askopenfilename(title="Selecciona resultado existente", filetypes=[("Excel", "*.xlsx *.xlsm")])
         if path:
             self.output_path_var.set(path)
+            self._set_path_text("output", path)
 
     def _select_folder(self) -> None:
         path = filedialog.askdirectory(title="Selecciona carpeta de expedientes")
         if path:
             self.folder_path_var.set(path)
+            self._set_path_text("folder", path)
 
     def _analyze(self) -> None:
         try:
@@ -235,8 +265,10 @@ class AuditorApp(Tk):
 
     def _log(self, message: str) -> None:
         timestamp = datetime.now().strftime("%H:%M:%S")
-        self.log_box.insert("end", f"[{timestamp}] {message}\n\n")
-        self.log_box.see("end")
+        self.log_lines.append(f"[{timestamp}] {message}")
+        self.log_lines = self.log_lines[-14:]
+        if self.log_text_item is not None:
+            self.canvas.itemconfigure(self.log_text_item, text="\n\n".join(self.log_lines))
 
     def _error(self, message: str) -> None:
         self._log(f"ERROR: {message}")
