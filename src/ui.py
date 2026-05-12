@@ -2,156 +2,157 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from tkinter import filedialog, messagebox
-
-import customtkinter as ctk
+from tkinter import BooleanVar, StringVar, Text, Tk, filedialog, messagebox, ttk
 
 from config import APP_NAME, DATA_SHEET_NAME, MONTHS
 from excel_service import ExcelValidationError, analyze_data_file, generate_result_file, inspect_output_file
 from models import AnalysisResult
 
 
-class AuditorApp(ctk.CTk):
+class AuditorApp(Tk):
     def __init__(self) -> None:
         super().__init__()
-
-        ctk.set_appearance_mode("dark")
-        ctk.set_default_color_theme("blue")
 
         self.title(APP_NAME)
         self.geometry("1080x720")
         self.minsize(920, 640)
+        self.configure(bg="#0b1120")
 
-        self.mode_var = ctk.StringVar(value="Crear archivo nuevo")
-        self.data_path_var = ctk.StringVar()
-        self.output_path_var = ctk.StringVar()
-        self.folder_path_var = ctk.StringVar()
-        self.month_var = ctk.StringVar(value=MONTHS[datetime.now().month - 1])
-        self.year_var = ctk.StringVar(value=str(datetime.now().year))
-        self.overwrite_var = ctk.BooleanVar(value=False)
+        self.mode_var = StringVar(value="Crear archivo nuevo")
+        self.data_path_var = StringVar()
+        self.output_path_var = StringVar()
+        self.folder_path_var = StringVar()
+        self.month_var = StringVar(value=MONTHS[datetime.now().month - 1])
+        self.year_var = StringVar(value=str(datetime.now().year))
+        self.overwrite_var = BooleanVar(value=False)
         self.analysis: AnalysisResult | None = None
 
+        self._configure_style()
         self._build_layout()
         self._update_output_label()
+        self.after(50, self._first_render)
+
+    def _configure_style(self) -> None:
+        style = ttk.Style(self)
+        style.theme_use("clam")
+        style.configure("App.TFrame", background="#0b1120")
+        style.configure("Card.TFrame", background="#111827", relief="flat")
+        style.configure("Info.TFrame", background="#172033", relief="flat")
+        style.configure("Title.TLabel", background="#0b1120", foreground="#e5f0ff", font=("Helvetica", 30, "bold"))
+        style.configure("Subtitle.TLabel", background="#0b1120", foreground="#94a3b8", font=("Helvetica", 14))
+        style.configure("Label.TLabel", background="#111827", foreground="#cbd5e1", font=("Helvetica", 13, "bold"))
+        style.configure("InfoTitle.TLabel", background="#172033", foreground="#67e8f9", font=("Helvetica", 13, "bold"))
+        style.configure("InfoText.TLabel", background="#172033", foreground="#cbd5e1", font=("Helvetica", 12))
+        style.configure("StatusTitle.TLabel", background="#111827", foreground="#e5f0ff", font=("Helvetica", 20, "bold"))
+        style.configure("TEntry", fieldbackground="#020617", foreground="#e5f0ff", insertcolor="#e5f0ff")
+        style.configure("TCombobox", fieldbackground="#020617", background="#020617", foreground="#e5f0ff")
+        style.configure("TCheckbutton", background="#111827", foreground="#cbd5e1", font=("Helvetica", 12))
+        style.map("TCheckbutton", background=[("active", "#111827")], foreground=[("active", "#67e8f9")])
+        style.configure("Primary.TButton", background="#2563eb", foreground="#ffffff", font=("Helvetica", 12, "bold"), padding=10)
+        style.configure("Accent.TButton", background="#0891b2", foreground="#ffffff", font=("Helvetica", 12, "bold"), padding=10)
+        style.configure("Neutral.TButton", background="#1f2937", foreground="#e5f0ff", font=("Helvetica", 11), padding=8)
+        style.map("Primary.TButton", background=[("active", "#1d4ed8")])
+        style.map("Accent.TButton", background=[("active", "#0e7490")])
+        style.map("Neutral.TButton", background=[("active", "#374151")])
 
     def _build_layout(self) -> None:
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
 
-        root = ctk.CTkFrame(self, fg_color="#0b1120")
+        root = ttk.Frame(self, style="App.TFrame", padding=26)
         root.grid(row=0, column=0, sticky="nsew")
-        root.grid_columnconfigure(0, weight=1)
-        root.grid_columnconfigure(1, weight=1)
-        root.grid_rowconfigure(1, weight=1)
+        root.columnconfigure(0, weight=2)
+        root.columnconfigure(1, weight=1)
+        root.rowconfigure(1, weight=1)
 
-        header = ctk.CTkFrame(root, fg_color="transparent")
-        header.grid(row=0, column=0, columnspan=2, sticky="ew", padx=26, pady=(22, 10))
-        header.grid_columnconfigure(0, weight=1)
-
-        title = ctk.CTkLabel(
-            header,
-            text="Auditor de Expedientes",
-            font=ctk.CTkFont(size=30, weight="bold"),
-            text_color="#e5f0ff",
-        )
-        title.grid(row=0, column=0, sticky="w")
-
-        subtitle = ctk.CTkLabel(
+        header = ttk.Frame(root, style="App.TFrame")
+        header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 16))
+        header.columnconfigure(0, weight=1)
+        ttk.Label(header, text="Auditor de Expedientes", style="Title.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(
             header,
             text="Genera DS acumulada y hojas mensuales estrictas desde el DATA oficial.",
-            font=ctk.CTkFont(size=14),
-            text_color="#94a3b8",
-        )
-        subtitle.grid(row=1, column=0, sticky="w", pady=(3, 0))
+            style="Subtitle.TLabel",
+        ).grid(row=1, column=0, sticky="w", pady=(3, 0))
 
-        form = ctk.CTkFrame(root, fg_color="#111827", corner_radius=18)
-        form.grid(row=1, column=0, sticky="nsew", padx=(26, 12), pady=(10, 26))
-        form.grid_columnconfigure(1, weight=1)
+        form = ttk.Frame(root, style="Card.TFrame", padding=18)
+        form.grid(row=1, column=0, sticky="nsew", padx=(0, 12))
+        form.columnconfigure(1, weight=1)
 
-        self._add_mode_selector(form, 0)
+        ttk.Label(form, text="Modo", style="Label.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 8))
+        mode = ttk.Combobox(form, textvariable=self.mode_var, values=["Crear archivo nuevo", "Actualizar archivo existente"], state="readonly")
+        mode.grid(row=0, column=1, columnspan=2, sticky="ew", padx=(10, 0), pady=(0, 8))
+        mode.bind("<<ComboboxSelected>>", lambda _event: self._update_output_label())
+
         self._add_file_row(form, 1, "DATA mensual", self.data_path_var, self._select_data_file, "Seleccionar DATA")
-        self.output_label = ctk.CTkLabel(form, text="Resultado", text_color="#cbd5e1", font=ctk.CTkFont(size=14, weight="bold"))
-        self.output_label.grid(row=2, column=0, sticky="w", padx=18, pady=(16, 4))
-        output_entry = ctk.CTkEntry(form, textvariable=self.output_path_var, height=38)
-        output_entry.grid(row=2, column=1, sticky="ew", padx=8, pady=(16, 4))
-        self.output_button = ctk.CTkButton(form, text="Seleccionar", command=self._select_output_file, height=38)
-        self.output_button.grid(row=2, column=2, sticky="ew", padx=(8, 18), pady=(16, 4))
+
+        self.output_label = ttk.Label(form, text="Resultado", style="Label.TLabel")
+        self.output_label.grid(row=2, column=0, sticky="w", pady=8)
+        ttk.Entry(form, textvariable=self.output_path_var).grid(row=2, column=1, sticky="ew", padx=(10, 10), pady=8)
+        self.output_button = ttk.Button(form, text="Seleccionar", command=self._select_output_file, style="Neutral.TButton")
+        self.output_button.grid(row=2, column=2, sticky="ew", pady=8)
 
         self._add_file_row(form, 3, "Carpeta expedientes", self.folder_path_var, self._select_folder, "Seleccionar carpeta")
 
-        period = ctk.CTkFrame(form, fg_color="transparent")
-        period.grid(row=4, column=0, columnspan=3, sticky="ew", padx=18, pady=(18, 4))
-        period.grid_columnconfigure(1, weight=1)
-        period.grid_columnconfigure(3, weight=1)
+        ttk.Label(form, text="Mes", style="Label.TLabel").grid(row=4, column=0, sticky="w", pady=8)
+        ttk.Combobox(form, textvariable=self.month_var, values=MONTHS, state="readonly").grid(row=4, column=1, sticky="ew", padx=(10, 10), pady=8)
+        ttk.Entry(form, textvariable=self.year_var, width=10).grid(row=4, column=2, sticky="ew", pady=8)
 
-        ctk.CTkLabel(period, text="Mes", text_color="#cbd5e1", font=ctk.CTkFont(size=14, weight="bold")).grid(row=0, column=0, sticky="w")
-        ctk.CTkOptionMenu(period, variable=self.month_var, values=MONTHS, height=38).grid(row=0, column=1, sticky="ew", padx=(10, 18))
-        ctk.CTkLabel(period, text="Año", text_color="#cbd5e1", font=ctk.CTkFont(size=14, weight="bold")).grid(row=0, column=2, sticky="w")
-        ctk.CTkEntry(period, textvariable=self.year_var, height=38, width=110).grid(row=0, column=3, sticky="ew", padx=(10, 0))
-
-        overwrite = ctk.CTkSwitch(
+        ttk.Checkbutton(
             form,
             text="Permitir reescribir el mes con confirmacion",
             variable=self.overwrite_var,
-            text_color="#cbd5e1",
-            progress_color="#22d3ee",
-        )
-        overwrite.grid(row=5, column=0, columnspan=3, sticky="w", padx=18, pady=(16, 8))
+        ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(14, 12))
 
-        instructions = ctk.CTkFrame(form, fg_color="#172033", corner_radius=14)
-        instructions.grid(row=6, column=0, columnspan=3, sticky="ew", padx=18, pady=(12, 14))
-        instructions.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(
+        instructions = ttk.Frame(form, style="Info.TFrame", padding=14)
+        instructions.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(4, 14))
+        instructions.columnconfigure(0, weight=1)
+        ttk.Label(
             instructions,
             text=f'El DATA debe contener una hoja llamada exactamente "{DATA_SHEET_NAME}".',
-            text_color="#67e8f9",
-            font=ctk.CTkFont(size=14, weight="bold"),
-        ).grid(row=0, column=0, sticky="w", padx=16, pady=(12, 4))
-        ctk.CTkLabel(
+            style="InfoTitle.TLabel",
+        ).grid(row=0, column=0, sticky="w")
+        ttk.Label(
             instructions,
             text="Columnas obligatorias: Patente, Pedimento, SeccionAduanera, TipoOperacion, ClaveDocumento, FechaPagoReal.",
-            text_color="#cbd5e1",
-            wraplength=560,
-            justify="left",
-        ).grid(row=1, column=0, sticky="w", padx=16, pady=(0, 12))
+            style="InfoText.TLabel",
+            wraplength=590,
+        ).grid(row=1, column=0, sticky="w", pady=(6, 0))
 
-        buttons = ctk.CTkFrame(form, fg_color="transparent")
-        buttons.grid(row=7, column=0, columnspan=3, sticky="ew", padx=18, pady=(4, 18))
-        buttons.grid_columnconfigure((0, 1), weight=1)
-        ctk.CTkButton(buttons, text="Analizar", command=self._analyze, height=44, fg_color="#2563eb").grid(row=0, column=0, sticky="ew", padx=(0, 8))
-        ctk.CTkButton(buttons, text="Generar Auditoria", command=self._generate, height=44, fg_color="#0891b2").grid(row=0, column=1, sticky="ew", padx=(8, 0))
+        buttons = ttk.Frame(form, style="Card.TFrame")
+        buttons.grid(row=7, column=0, columnspan=3, sticky="ew")
+        buttons.columnconfigure(0, weight=1)
+        buttons.columnconfigure(1, weight=1)
+        ttk.Button(buttons, text="Analizar", command=self._analyze, style="Primary.TButton").grid(row=0, column=0, sticky="ew", padx=(0, 8))
+        ttk.Button(buttons, text="Generar Auditoria", command=self._generate, style="Accent.TButton").grid(row=0, column=1, sticky="ew", padx=(8, 0))
 
-        side = ctk.CTkFrame(root, fg_color="#111827", corner_radius=18)
-        side.grid(row=1, column=1, sticky="nsew", padx=(12, 26), pady=(10, 26))
-        side.grid_columnconfigure(0, weight=1)
-        side.grid_rowconfigure(1, weight=1)
-
-        ctk.CTkLabel(side, text="Estado", font=ctk.CTkFont(size=20, weight="bold"), text_color="#e5f0ff").grid(
-            row=0, column=0, sticky="w", padx=18, pady=(18, 8)
+        side = ttk.Frame(root, style="Card.TFrame", padding=18)
+        side.grid(row=1, column=1, sticky="nsew", padx=(12, 0))
+        side.columnconfigure(0, weight=1)
+        side.rowconfigure(1, weight=1)
+        ttk.Label(side, text="Estado", style="StatusTitle.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 12))
+        self.log_box = Text(
+            side,
+            bg="#020617",
+            fg="#dbeafe",
+            insertbackground="#dbeafe",
+            relief="flat",
+            wrap="word",
+            font=("Menlo", 12),
+            padx=12,
+            pady=12,
         )
-        self.log_box = ctk.CTkTextbox(side, fg_color="#020617", text_color="#dbeafe", corner_radius=14, wrap="word")
-        self.log_box.grid(row=1, column=0, sticky="nsew", padx=18, pady=(0, 18))
+        self.log_box.grid(row=1, column=0, sticky="nsew")
         self._log("Listo. Selecciona el DATA mensual, resultado y carpeta de expedientes.")
 
-    def _add_mode_selector(self, parent: ctk.CTkFrame, row: int) -> None:
-        ctk.CTkLabel(parent, text="Modo", text_color="#cbd5e1", font=ctk.CTkFont(size=14, weight="bold")).grid(
-            row=row, column=0, sticky="w", padx=18, pady=(18, 4)
-        )
-        segmented = ctk.CTkSegmentedButton(
-            parent,
-            values=["Crear archivo nuevo", "Actualizar archivo existente"],
-            variable=self.mode_var,
-            command=lambda _: self._update_output_label(),
-            height=38,
-        )
-        segmented.grid(row=row, column=1, columnspan=2, sticky="ew", padx=(8, 18), pady=(18, 4))
+    def _add_file_row(self, parent, row: int, label: str, variable: StringVar, command, button_text: str) -> None:
+        ttk.Label(parent, text=label, style="Label.TLabel").grid(row=row, column=0, sticky="w", pady=8)
+        ttk.Entry(parent, textvariable=variable).grid(row=row, column=1, sticky="ew", padx=(10, 10), pady=8)
+        ttk.Button(parent, text=button_text, command=command, style="Neutral.TButton").grid(row=row, column=2, sticky="ew", pady=8)
 
-    def _add_file_row(self, parent, row: int, label: str, variable: ctk.StringVar, command, button_text: str) -> None:
-        ctk.CTkLabel(parent, text=label, text_color="#cbd5e1", font=ctk.CTkFont(size=14, weight="bold")).grid(
-            row=row, column=0, sticky="w", padx=18, pady=(16, 4)
-        )
-        ctk.CTkEntry(parent, textvariable=variable, height=38).grid(row=row, column=1, sticky="ew", padx=8, pady=(16, 4))
-        ctk.CTkButton(parent, text=button_text, command=command, height=38).grid(row=row, column=2, sticky="ew", padx=(8, 18), pady=(16, 4))
+    def _first_render(self) -> None:
+        self.update_idletasks()
+        self.lift()
 
     def _update_output_label(self) -> None:
         if not hasattr(self, "output_label"):
