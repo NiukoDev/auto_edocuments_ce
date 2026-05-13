@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from config import PD_FILE_PATTERN
 from models import DataRecord
 
 
@@ -18,12 +17,12 @@ def build_file_index(root: str | Path) -> list[str]:
     return indexed_names
 
 
-def has_pd_document(record: DataRecord, indexed_names: list[str]) -> bool:
+def has_document(record: DataRecord, indexed_names: list[str], pattern: str) -> bool:
     compact_key = record.llave.replace("-", "").lower()
     pedimento = record.pedimento.lower()
 
     for name in indexed_names:
-        if PD_FILE_PATTERN not in name:
+        if pattern not in name:
             continue
         if compact_key in name or pedimento in name:
             return True

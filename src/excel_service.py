@@ -10,8 +10,8 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from config import DATA_SHEET_NAME, DS_COLUMNS, DS_SHEET_NAME, MONTHLY_COLUMNS, REQUIRED_DATA_COLUMNS
-from file_scanner import build_file_index, has_pd_document
+from config import DATA_SHEET_NAME, DOCUMENT_PATTERNS, DS_COLUMNS, DS_SHEET_NAME, MONTHLY_COLUMNS, REQUIRED_DATA_COLUMNS
+from file_scanner import build_file_index, has_document
 from models import AnalysisResult, DataRecord, GenerationResult
 
 
@@ -174,7 +174,7 @@ def generate_result_file(
 
     _append_to_ds(workbook[DS_SHEET_NAME], analysis.records)
     indexed_names = build_file_index(expedients_folder) if expedients_folder else []
-    pd_found, pd_missing = _create_month_sheet(workbook, month, analysis.records, indexed_names)
+    document_counts = _create_month_sheet(workbook, month, analysis.records, indexed_names)
     _order_sheets(workbook, month)
 
     try:
@@ -188,8 +188,10 @@ def generate_result_file(
         records_written=len(analysis.records),
         month_replaced=month_replaced,
         generated_at=datetime.now(),
-        pd_found=pd_found,
-        pd_missing=pd_missing,
+        pd_found=document_counts["PD"]["found"],
+        pd_missing=document_counts["PD"]["missing"],
+        ps_found=document_counts["PS"]["found"],
+        ps_missing=document_counts["PS"]["missing"],
     )
 
 
@@ -259,14 +261,13 @@ def _create_month_sheet(
     month: str,
     records: list[DataRecord],
     indexed_names: list[str],
-) -> tuple[int, int]:
+) -> dict[str, dict[str, int]]:
     sheet = workbook.create_sheet(month)
     sheet.append(MONTHLY_COLUMNS)
     _style_header(sheet, 1, len(MONTHLY_COLUMNS))
 
     current_group: tuple[str, str] | None = None
-    pd_found = 0
-    pd_missing = 0
+    document_counts = {column: {"found": 0, "missing": 0} for column in DOCUMENT_PATTERNS}
     sorted_records = sorted(records, key=lambda item: (_as_text(item.tipo_operacion), item.clave_documento, item.llave))
     for record in sorted_records:
         group = (_as_text(record.tipo_operacion), record.clave_documento)
@@ -280,24 +281,28 @@ def _create_month_sheet(
             group_cell.font = Font(color="67E8F9", bold=True)
             group_cell.alignment = Alignment(horizontal="left", vertical="center")
 
-        pd_value = ""
+        document_values = {column: "" for column in DOCUMENT_PATTERNS}
+        missing_documents: list[str] = []
         comments = "Pendiente de validacion documental"
         if indexed_names:
-            if has_pd_document(record, indexed_names):
-                pd_found += 1
-                pd_value = "a"
-            else:
-                pd_missing += 1
-                pd_value = "x"
-                comments = "Falta PD: tipodocumento=PED_no=2"
+            for column, pattern in DOCUMENT_PATTERNS.items():
+                if has_document(record, indexed_names, pattern):
+                    document_counts[column]["found"] += 1
+                    document_values[column] = "a"
+                else:
+                    document_counts[column]["missing"] += 1
+                    document_values[column] = "x"
+                    missing_documents.append(f"{column}: {pattern}")
+            if missing_documents:
+                comments = "Falta " + ", ".join(missing_documents)
 
         sheet.append(
             [
                 record.llave,
                 record.clave_documento,
                 record.fecha_pago_real,
-                pd_value,
-                "",
+                document_values["PD"],
+                document_values["PS"],
                 "",
                 "",
                 "",
@@ -323,7 +328,7 @@ def _create_month_sheet(
     sheet.freeze_panes = "A2"
     sheet.auto_filter.ref = sheet.dimensions
     _resize_columns(sheet)
-    return pd_found, pd_missing
+    return document_counts
 
 
 def _style_header(sheet, row: int, columns: int) -> None:

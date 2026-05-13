@@ -453,6 +453,8 @@ class AuditorApp(QMainWindow):
                 f"Registros: {result.records_written}\n"
                 f"PD encontrados: {result.pd_found}\n"
                 f"PD faltantes: {result.pd_missing}\n"
+                f"PS encontrados: {result.ps_found}\n"
+                f"PS faltantes: {result.ps_missing}\n"
                 f"Reemplazado: {'sí' if result.month_replaced else 'no'}{backup}"
             )
             QMessageBox.information(self, "Auditoría generada",

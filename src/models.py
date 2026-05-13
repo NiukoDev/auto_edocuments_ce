@@ -37,3 +37,5 @@ class GenerationResult:
     generated_at: datetime
     pd_found: int = 0
     pd_missing: int = 0
+    ps_found: int = 0
+    ps_missing: int = 0
