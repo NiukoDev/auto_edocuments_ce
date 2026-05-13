@@ -10,7 +10,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from config import DATA_SHEET_NAME, DOCUMENT_PATTERNS, DS_COLUMNS, DS_SHEET_NAME, MONTHLY_COLUMNS, REQUIRED_DATA_COLUMNS
+from config import DATA_SHEET_NAME, DOCUMENT_RULES, DS_COLUMNS, DS_SHEET_NAME, MONTHLY_COLUMNS, REQUIRED_DATA_COLUMNS
 from file_scanner import build_file_index, has_document
 from models import AnalysisResult, DataRecord, GenerationResult
 
@@ -194,6 +194,8 @@ def generate_result_file(
         ps_missing=document_counts["PS"]["missing"],
         xmlpd_found=document_counts["XMLPD"]["found"],
         xmlpd_missing=document_counts["XMLPD"]["missing"],
+        doda_found=document_counts["DODA/PITA/AVC"]["found"],
+        doda_missing=document_counts["DODA/PITA/AVC"]["missing"],
     )
 
 
@@ -269,7 +271,7 @@ def _create_month_sheet(
     _style_header(sheet, 1, len(MONTHLY_COLUMNS))
 
     current_group: tuple[str, str] | None = None
-    document_counts = {column: {"found": 0, "missing": 0} for column in DOCUMENT_PATTERNS}
+    document_counts = {column: {"found": 0, "missing": 0} for column in DOCUMENT_RULES}
     sorted_records = sorted(records, key=lambda item: (_as_text(item.tipo_operacion), item.clave_documento, item.llave))
     for record in sorted_records:
         group = (_as_text(record.tipo_operacion), record.clave_documento)
@@ -283,18 +285,20 @@ def _create_month_sheet(
             group_cell.font = Font(color="67E8F9", bold=True)
             group_cell.alignment = Alignment(horizontal="left", vertical="center")
 
-        document_values = {column: "" for column in DOCUMENT_PATTERNS}
+        document_values = {column: "" for column in DOCUMENT_RULES}
         missing_documents: list[str] = []
         comments = "Pendiente de validacion documental"
         if indexed_names:
-            for column, pattern in DOCUMENT_PATTERNS.items():
-                if has_document(record, indexed_names, pattern):
+            for column, rule in DOCUMENT_RULES.items():
+                pattern = rule["pattern"]
+                extension = rule["extension"]
+                if has_document(record, indexed_names, pattern, extension):
                     document_counts[column]["found"] += 1
                     document_values[column] = "a"
                 else:
                     document_counts[column]["missing"] += 1
                     document_values[column] = "x"
-                    missing_documents.append(f"{column}: {pattern}")
+                    missing_documents.append(f"{column}: {pattern}{extension}")
             if missing_documents:
                 comments = "Falta " + ", ".join(missing_documents)
 
@@ -306,7 +310,7 @@ def _create_month_sheet(
                 document_values["PD"],
                 document_values["PS"],
                 document_values["XMLPD"],
-                "",
+                document_values["DODA/PITA/AVC"],
                 "",
                 "",
                 "",

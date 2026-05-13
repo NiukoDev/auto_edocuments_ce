@@ -17,12 +17,14 @@ def build_file_index(root: str | Path) -> list[str]:
     return indexed_names
 
 
-def has_document(record: DataRecord, indexed_names: list[str], pattern: str) -> bool:
+def has_document(record: DataRecord, indexed_names: list[str], pattern: str, extension: str) -> bool:
     compact_key = record.llave.replace("-", "").lower()
     pedimento = record.pedimento.lower()
 
     for name in indexed_names:
         if pattern not in name:
+            continue
+        if extension and not name.endswith(extension.lower()):
             continue
         if compact_key in name or pedimento in name:
             return True

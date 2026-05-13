@@ -51,10 +51,11 @@ MONTHLY_COLUMNS = [
     "Comentarios",
 ]
 
-DOCUMENT_PATTERNS = {
-    "PD": "tipodocumento=ped_no=2",
-    "PS": "tipodocumento=ped_no=1",
-    "XMLPD": "tipodocumento=xmlc",
+DOCUMENT_RULES = {
+    "PD": {"pattern": "tipodocumento=ped_no=2", "extension": ".pdf"},
+    "PS": {"pattern": "tipodocumento=ped_no=1", "extension": ".pdf"},
+    "XMLPD": {"pattern": "tipodocumento=xmlc", "extension": ".xml"},
+    "DODA/PITA/AVC": {"pattern": "tipodocumento=dpdf", "extension": ".pdf"},
 }
 
 MONTHS = [

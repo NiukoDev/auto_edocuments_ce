@@ -41,3 +41,5 @@ class GenerationResult:
     ps_missing: int = 0
     xmlpd_found: int = 0
     xmlpd_missing: int = 0
+    doda_found: int = 0
+    doda_missing: int = 0
