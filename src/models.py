@@ -45,3 +45,5 @@ class GenerationResult:
     doda_missing: int = 0
     detalle_cove_found: int = 0
     detalle_cove_missing: int = 0
+    acuse_cove_found: int = 0
+    acuse_cove_missing: int = 0

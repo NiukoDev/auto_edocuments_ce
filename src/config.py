@@ -57,6 +57,7 @@ DOCUMENT_RULES = {
     "XMLPD": {"pattern": "tipodocumento=xmlc", "extension": ".xml"},
     "DODA/PITA/AVC": {"pattern": "tipodocumento=dpdf", "extension": ".pdf"},
     "DETALLE COVE": {"pattern": "tipodocumento=acvp_no=cove", "extension": ".pdf"},
+    "ACUSE COVE": {"pattern": "tipodocumento=acvpa", "extension": ".pdf"},
 }
 
 MONTHS = [

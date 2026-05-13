@@ -198,6 +198,8 @@ def generate_result_file(
         doda_missing=document_counts["DODA/PITA/AVC"]["missing"],
         detalle_cove_found=document_counts["DETALLE COVE"]["found"],
         detalle_cove_missing=document_counts["DETALLE COVE"]["missing"],
+        acuse_cove_found=document_counts["ACUSE COVE"]["found"],
+        acuse_cove_missing=document_counts["ACUSE COVE"]["missing"],
     )
 
 
@@ -314,7 +316,7 @@ def _create_month_sheet(
                 document_values["XMLPD"],
                 document_values["DODA/PITA/AVC"],
                 document_values["DETALLE COVE"],
-                "",
+                document_values["ACUSE COVE"],
                 "",
                 "",
                 "",
