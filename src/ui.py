@@ -455,6 +455,8 @@ class AuditorApp(QMainWindow):
                 f"PD faltantes: {result.pd_missing}\n"
                 f"PS encontrados: {result.ps_found}\n"
                 f"PS faltantes: {result.ps_missing}\n"
+                f"XMLPD encontrados: {result.xmlpd_found}\n"
+                f"XMLPD faltantes: {result.xmlpd_missing}\n"
                 f"Reemplazado: {'sí' if result.month_replaced else 'no'}{backup}"
             )
             QMessageBox.information(self, "Auditoría generada",

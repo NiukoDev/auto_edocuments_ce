@@ -192,6 +192,8 @@ def generate_result_file(
         pd_missing=document_counts["PD"]["missing"],
         ps_found=document_counts["PS"]["found"],
         ps_missing=document_counts["PS"]["missing"],
+        xmlpd_found=document_counts["XMLPD"]["found"],
+        xmlpd_missing=document_counts["XMLPD"]["missing"],
     )
 
 
@@ -303,7 +305,7 @@ def _create_month_sheet(
                 record.fecha_pago_real,
                 document_values["PD"],
                 document_values["PS"],
-                "",
+                document_values["XMLPD"],
                 "",
                 "",
                 "",

@@ -39,3 +39,5 @@ class GenerationResult:
     pd_missing: int = 0
     ps_found: int = 0
     ps_missing: int = 0
+    xmlpd_found: int = 0
+    xmlpd_missing: int = 0

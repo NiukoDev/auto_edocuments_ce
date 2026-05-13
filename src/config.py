@@ -54,6 +54,7 @@ MONTHLY_COLUMNS = [
 DOCUMENT_PATTERNS = {
     "PD": "tipodocumento=ped_no=2",
     "PS": "tipodocumento=ped_no=1",
+    "XMLPD": "tipodocumento=xmlc",
 }
 
 MONTHS = [
