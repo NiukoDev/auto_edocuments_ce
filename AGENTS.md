@@ -19,7 +19,7 @@
 - Columnas obligatorias del DATA: `Patente`, `Pedimento`, `SeccionAduanera`, `TipoOperacion`, `ClaveDocumento`, `FechaPagoReal`.
 - La llave se recalcula como `SeccionAduanera-Patente-Pedimento`; no confiar en una columna `LLAVE` del DATA.
 - `DS` es acumulada anual. Al reescribir un mes, eliminar primero las filas de ese `MES` en `DS` y recrear la hoja mensual.
-- Validaciones documentales implementadas: `PD` busca `tipodocumento=PED_no=2` en `.pdf`; `PS` busca `tipodocumento=PED_no=1` en `.pdf`; `XMLPD` busca `tipodocumento=XMLC` en `.xml`; `DODA/PITA/AVC` busca `tipodocumento=DPDF` en `.pdf`. Todas escanean recursivamente nombres/rutas contra llave compacta o pedimento y marcan `a`/`x`. El `ESTATUS` general sigue en `PENDIENTE`.
+- Validaciones documentales implementadas: `PD` busca `tipodocumento=PED_no=2` en `.pdf`; `PS` busca `tipodocumento=PED_no=1` en `.pdf`; `XMLPD` busca `tipodocumento=XMLC` en `.xml`; `DODA/PITA/AVC` busca `tipodocumento=DPDF` en `.pdf`; `DETALLE COVE` busca `tipodocumento=ACVP_no=COVE` en `.pdf`. Todas escanean recursivamente nombres/rutas contra llave compacta o pedimento y marcan `a`/`x`. El `ESTATUS` general sigue en `PENDIENTE`.
 
 ## Datos locales y repo
 - `doc_aux/` contiene muestras/expedientes locales y esta ignorado; no lo versionar.

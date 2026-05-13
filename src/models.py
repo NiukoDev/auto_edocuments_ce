@@ -43,3 +43,5 @@ class GenerationResult:
     xmlpd_missing: int = 0
     doda_found: int = 0
     doda_missing: int = 0
+    detalle_cove_found: int = 0
+    detalle_cove_missing: int = 0
