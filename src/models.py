@@ -47,3 +47,5 @@ class GenerationResult:
     detalle_cove_missing: int = 0
     acuse_cove_found: int = 0
     acuse_cove_missing: int = 0
+    xml_cove_found: int = 0
+    xml_cove_missing: int = 0

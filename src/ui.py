@@ -463,6 +463,8 @@ class AuditorApp(QMainWindow):
                 f"DETALLE COVE faltantes: {result.detalle_cove_missing}\n"
                 f"ACUSE COVE encontrados: {result.acuse_cove_found}\n"
                 f"ACUSE COVE faltantes: {result.acuse_cove_missing}\n"
+                f"XML COVE encontrados: {result.xml_cove_found}\n"
+                f"XML COVE faltantes: {result.xml_cove_missing}\n"
                 f"Reemplazado: {'sí' if result.month_replaced else 'no'}{backup}"
             )
             QMessageBox.information(self, "Auditoría generada",

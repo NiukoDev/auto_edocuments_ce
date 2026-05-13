@@ -58,6 +58,7 @@ DOCUMENT_RULES = {
     "DODA/PITA/AVC": {"pattern": "tipodocumento=dpdf", "extension": ".pdf"},
     "DETALLE COVE": {"pattern": "tipodocumento=acvp_no=cove", "extension": ".pdf"},
     "ACUSE COVE": {"pattern": "tipodocumento=acvpa", "extension": ".pdf"},
+    "XML COVE": {"pattern": "cove", "extension": ".xml"},
 }
 
 MONTHS = [
