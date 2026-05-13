@@ -49,3 +49,5 @@ class GenerationResult:
     acuse_cove_missing: int = 0
     xml_cove_found: int = 0
     xml_cove_missing: int = 0
+    factura_found: int = 0
+    factura_missing: int = 0

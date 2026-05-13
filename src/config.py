@@ -59,6 +59,7 @@ DOCUMENT_RULES = {
     "DETALLE COVE": {"pattern": "tipodocumento=acvp_no=cove", "extension": ".pdf"},
     "ACUSE COVE": {"pattern": "tipodocumento=acvpa", "extension": ".pdf"},
     "XML COVE": {"pattern": "cove", "extension": ".xml"},
+    "FACTURA": {"pattern": "tipodocumento=fac_no=1", "extension": ".pdf"},
 }
 
 MONTHS = [

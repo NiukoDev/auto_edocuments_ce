@@ -202,6 +202,8 @@ def generate_result_file(
         acuse_cove_missing=document_counts["ACUSE COVE"]["missing"],
         xml_cove_found=document_counts["XML COVE"]["found"],
         xml_cove_missing=document_counts["XML COVE"]["missing"],
+        factura_found=document_counts["FACTURA"]["found"],
+        factura_missing=document_counts["FACTURA"]["missing"],
     )
 
 
@@ -320,7 +322,7 @@ def _create_month_sheet(
                 document_values["DETALLE COVE"],
                 document_values["ACUSE COVE"],
                 document_values["XML COVE"],
-                "",
+                document_values["FACTURA"],
                 "",
                 "",
                 "",
