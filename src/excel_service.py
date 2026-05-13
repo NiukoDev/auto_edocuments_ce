@@ -249,7 +249,20 @@ def _create_month_sheet(workbook: Workbook, month: str, records: list[DataRecord
     sheet.append(MONTHLY_COLUMNS)
     _style_header(sheet, 1, len(MONTHLY_COLUMNS))
 
-    for record in sorted(records, key=lambda item: (item.clave_documento, item.llave)):
+    current_group: tuple[str, str] | None = None
+    sorted_records = sorted(records, key=lambda item: (_as_text(item.tipo_operacion), item.clave_documento, item.llave))
+    for record in sorted_records:
+        group = (_as_text(record.tipo_operacion), record.clave_documento)
+        if group != current_group:
+            current_group = group
+            sheet.append([f"TipoOperacion: {group[0]} | ClaveDocumento: {group[1]}"] + [""] * (len(MONTHLY_COLUMNS) - 1))
+            group_row = sheet.max_row
+            sheet.merge_cells(start_row=group_row, start_column=1, end_row=group_row, end_column=len(MONTHLY_COLUMNS))
+            group_cell = sheet.cell(group_row, 1)
+            group_cell.fill = PatternFill("solid", fgColor="172033")
+            group_cell.font = Font(color="67E8F9", bold=True)
+            group_cell.alignment = Alignment(horizontal="left", vertical="center")
+
         sheet.append(
             [
                 record.llave,
