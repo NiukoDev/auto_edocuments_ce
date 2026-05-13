@@ -19,7 +19,7 @@
 - Columnas obligatorias del DATA: `Patente`, `Pedimento`, `SeccionAduanera`, `TipoOperacion`, `ClaveDocumento`, `FechaPagoReal`.
 - La llave se recalcula como `SeccionAduanera-Patente-Pedimento`; no confiar en una columna `LLAVE` del DATA.
 - `DS` es acumulada anual. Al reescribir un mes, eliminar primero las filas de ese `MES` en `DS` y recrear la hoja mensual.
-- La app aun no valida documentos de la carpeta de expedientes; por ahora crea columnas de auditoria y deja `ESTATUS = PENDIENTE`.
+- La primera validacion documental implementada es `PD`: busca recursivamente nombres/rutas con `tipodocumento=PED_no=2` y la llave compacta o pedimento; marca `a` si existe y `x` si falta. El `ESTATUS` general sigue en `PENDIENTE`.
 
 ## Datos locales y repo
 - `doc_aux/` contiene muestras/expedientes locales y esta ignorado; no lo versionar.

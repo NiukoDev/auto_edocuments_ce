@@ -35,3 +35,5 @@ class GenerationResult:
     records_written: int
     month_replaced: bool
     generated_at: datetime
+    pd_found: int = 0
+    pd_missing: int = 0

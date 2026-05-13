@@ -51,6 +51,8 @@ MONTHLY_COLUMNS = [
     "Comentarios",
 ]
 
+PD_FILE_PATTERN = "tipodocumento=ped_no=2"
+
 MONTHS = [
     "ENERO",
     "FEBRERO",

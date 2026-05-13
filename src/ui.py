@@ -444,12 +444,15 @@ class AuditorApp(QMainWindow):
             result = generate_result_file(
                 output_path=out, analysis=self.analysis, month=month,
                 overwrite_month=self.overwrite_chk.isChecked() or has_sheet or has_rows,
+                expedients_folder=self._folder_path,
                 create_backup=True,
             )
             backup = f"\nRespaldo: {result.backup_path}" if result.backup_path else ""
             self._log(
                 f"Generado: {result.output_path}\n"
                 f"Registros: {result.records_written}\n"
+                f"PD encontrados: {result.pd_found}\n"
+                f"PD faltantes: {result.pd_missing}\n"
                 f"Reemplazado: {'sí' if result.month_replaced else 'no'}{backup}"
             )
             QMessageBox.information(self, "Auditoría generada",

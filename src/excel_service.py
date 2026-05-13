@@ -11,6 +11,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from config import DATA_SHEET_NAME, DS_COLUMNS, DS_SHEET_NAME, MONTHLY_COLUMNS, REQUIRED_DATA_COLUMNS
+from file_scanner import build_file_index, has_pd_document
 from models import AnalysisResult, DataRecord, GenerationResult
 
 
@@ -34,6 +35,11 @@ def _as_text(value: Any) -> str:
 
 def _build_key(seccion_aduanera: Any, patente: Any, pedimento: Any) -> str:
     return f"{_as_text(seccion_aduanera)}-{_as_text(patente)}-{_as_text(pedimento)}"
+
+
+def _format_operation_type(value: Any) -> str:
+    operation_type = _as_text(value)
+    return {"1": "Importacion", "2": "Exportacion"}.get(operation_type, operation_type)
 
 
 def _is_supported_excel(path: Path) -> bool:
@@ -82,7 +88,7 @@ def analyze_data_file(data_path: str | Path, month: str) -> AnalysisResult:
                 pedimento=_as_text(pedimento),
                 seccion_aduanera=_as_text(seccion),
                 llave=llave,
-                tipo_operacion=tipo_operacion,
+                tipo_operacion=_format_operation_type(tipo_operacion),
                 clave_documento=_as_text(clave_documento),
                 fecha_pago_real=fecha_pago_real,
                 estatus="PENDIENTE",
@@ -128,6 +134,7 @@ def generate_result_file(
     analysis: AnalysisResult,
     month: str,
     overwrite_month: bool,
+    expedients_folder: str | Path | None = None,
     create_backup: bool = True,
 ) -> GenerationResult:
     path = Path(output_path)
@@ -166,7 +173,8 @@ def generate_result_file(
         raise ExcelValidationError(f"La hoja {month} ya existe y no se pudo reemplazar.")
 
     _append_to_ds(workbook[DS_SHEET_NAME], analysis.records)
-    _create_month_sheet(workbook, month, analysis.records)
+    indexed_names = build_file_index(expedients_folder) if expedients_folder else []
+    pd_found, pd_missing = _create_month_sheet(workbook, month, analysis.records, indexed_names)
     _order_sheets(workbook, month)
 
     try:
@@ -180,6 +188,8 @@ def generate_result_file(
         records_written=len(analysis.records),
         month_replaced=month_replaced,
         generated_at=datetime.now(),
+        pd_found=pd_found,
+        pd_missing=pd_missing,
     )
 
 
@@ -244,12 +254,19 @@ def _append_to_ds(sheet, records: list[DataRecord]) -> None:
     _resize_columns(sheet)
 
 
-def _create_month_sheet(workbook: Workbook, month: str, records: list[DataRecord]) -> None:
+def _create_month_sheet(
+    workbook: Workbook,
+    month: str,
+    records: list[DataRecord],
+    indexed_names: list[str],
+) -> tuple[int, int]:
     sheet = workbook.create_sheet(month)
     sheet.append(MONTHLY_COLUMNS)
     _style_header(sheet, 1, len(MONTHLY_COLUMNS))
 
     current_group: tuple[str, str] | None = None
+    pd_found = 0
+    pd_missing = 0
     sorted_records = sorted(records, key=lambda item: (_as_text(item.tipo_operacion), item.clave_documento, item.llave))
     for record in sorted_records:
         group = (_as_text(record.tipo_operacion), record.clave_documento)
@@ -263,12 +280,23 @@ def _create_month_sheet(workbook: Workbook, month: str, records: list[DataRecord
             group_cell.font = Font(color="67E8F9", bold=True)
             group_cell.alignment = Alignment(horizontal="left", vertical="center")
 
+        pd_value = ""
+        comments = "Pendiente de validacion documental"
+        if indexed_names:
+            if has_pd_document(record, indexed_names):
+                pd_found += 1
+                pd_value = "a"
+            else:
+                pd_missing += 1
+                pd_value = "x"
+                comments = "Falta PD: tipodocumento=PED_no=2"
+
         sheet.append(
             [
                 record.llave,
                 record.clave_documento,
                 record.fecha_pago_real,
-                "",
+                pd_value,
                 "",
                 "",
                 "",
@@ -288,13 +316,14 @@ def _create_month_sheet(workbook: Workbook, month: str, records: list[DataRecord
                 "",
                 "",
                 "PENDIENTE",
-                "Pendiente de validacion documental",
+                comments,
             ]
         )
 
     sheet.freeze_panes = "A2"
     sheet.auto_filter.ref = sheet.dimensions
     _resize_columns(sheet)
+    return pd_found, pd_missing
 
 
 def _style_header(sheet, row: int, columns: int) -> None:
