@@ -62,6 +62,16 @@ DOCUMENT_RULES = {
     "FACTURA": {"pattern": "tipodocumento=fac_no=1", "extension": ".pdf"},
 }
 
+DOCUMENTS_NOT_APPLICABLE_BY_COLUMN = {
+    "DODA/PITA/AVC": {"Importacion": {"F4", "V1"}},
+    "DETALLE COVE": {"Importacion": {"V1"}},
+    "ACUSE COVE": {"Importacion": {"V1"}},
+    "XML COVE": {"Importacion": {"V1"}},
+    "HC": {"Exportacion": {"*"}},
+    "MV": {"Exportacion": {"*"}},
+    "Comprobante incrementables": {"Importacion": {"V1"}, "Exportacion": {"*"}},
+}
+
 MONTHS = [
     "ENERO",
     "FEBRERO",

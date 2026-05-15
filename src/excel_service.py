@@ -10,7 +10,15 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from config import DATA_SHEET_NAME, DOCUMENT_RULES, DS_COLUMNS, DS_SHEET_NAME, MONTHLY_COLUMNS, REQUIRED_DATA_COLUMNS
+from config import (
+    DATA_SHEET_NAME,
+    DOCUMENT_RULES,
+    DOCUMENTS_NOT_APPLICABLE_BY_COLUMN,
+    DS_COLUMNS,
+    DS_SHEET_NAME,
+    MONTHLY_COLUMNS,
+    REQUIRED_DATA_COLUMNS,
+)
 from file_scanner import build_file_index, has_document
 from models import AnalysisResult, DataRecord, GenerationResult
 
@@ -40,6 +48,17 @@ def _build_key(seccion_aduanera: Any, patente: Any, pedimento: Any) -> str:
 def _format_operation_type(value: Any) -> str:
     operation_type = _as_text(value)
     return {"1": "Importacion", "2": "Exportacion"}.get(operation_type, operation_type)
+
+
+def _is_not_applicable(record: DataRecord, column: str) -> bool:
+    operation_type = _as_text(record.tipo_operacion).casefold()
+    document_key = record.clave_documento.upper()
+    operation_rules = DOCUMENTS_NOT_APPLICABLE_BY_COLUMN.get(column, {})
+    for configured_operation, document_keys in operation_rules.items():
+        if operation_type == _as_text(configured_operation).casefold():
+            configured_keys = {key.upper() for key in document_keys}
+            return "*" in configured_keys or document_key in configured_keys
+    return False
 
 
 def _is_supported_excel(path: Path) -> bool:
@@ -294,10 +313,15 @@ def _create_month_sheet(
             group_cell.alignment = Alignment(horizontal="left", vertical="center")
 
         document_values = {column: "" for column in DOCUMENT_RULES}
+        for column in MONTHLY_COLUMNS:
+            if _is_not_applicable(record, column):
+                document_values[column] = "NA"
         missing_documents: list[str] = []
         comments = "Pendiente de validacion documental"
         if indexed_names:
             for column, rule in DOCUMENT_RULES.items():
+                if document_values.get(column) == "NA":
+                    continue
                 pattern = rule["pattern"]
                 extension = rule["extension"]
                 if has_document(record, indexed_names, pattern, extension):
@@ -330,10 +354,10 @@ def _create_month_sheet(
                 "",
                 "",
                 "",
+                document_values.get("HC", ""),
+                document_values.get("MV", ""),
                 "",
-                "",
-                "",
-                "",
+                document_values.get("Comprobante incrementables", ""),
                 "PENDIENTE",
                 comments,
             ]
