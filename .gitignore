@@ -6,6 +6,9 @@ __pycache__/
 
 # Datos locales de prueba / expedientes del cliente
 doc_aux/
+assets/
+salida.xlsx
+*.backup-*.xlsx
 
 # Build del ejecutable
 build/

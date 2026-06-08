@@ -11,15 +11,25 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from config import (
+    ACUSE_DEPENDENT_COLUMNS,
     DATA_SHEET_NAME,
+    DOCUMENT_PATTERNS_BY_PATENT,
+    DOCUMENT_PREFIX_FALLBACKS,
     DOCUMENT_RULES,
+    DOCUMENTS_NA_EXCEPT_PATENTS,
+    DOCUMENTS_NA_FOR_CLAVES,
+    DOCUMENTS_NA_FOR_PATENTS,
     DOCUMENTS_NOT_APPLICABLE_BY_COLUMN,
     DS_COLUMNS,
     DS_SHEET_NAME,
     MONTHLY_COLUMNS,
+    MONTHS,
+    PAYMENT_VALIDATION_FILES,
+    PERCENTAGES_COLUMNS,
+    PERCENTAGES_SHEET_NAME,
     REQUIRED_DATA_COLUMNS,
 )
-from file_scanner import build_file_index, has_document
+from file_scanner import build_file_index, find_document_path, has_document, has_document_by_llave, has_document_by_prefix, missing_payment_validation_files
 from models import AnalysisResult, DataRecord, GenerationResult
 
 
@@ -51,6 +61,18 @@ def _format_operation_type(value: Any) -> str:
 
 
 def _is_not_applicable(record: DataRecord, column: str) -> bool:
+    allowed_patents = DOCUMENTS_NA_EXCEPT_PATENTS.get(column)
+    if allowed_patents is not None and record.patente not in allowed_patents:
+        return True
+
+    na_patents = DOCUMENTS_NA_FOR_PATENTS.get(column)
+    if na_patents is not None and record.patente in na_patents:
+        return True
+
+    na_claves = DOCUMENTS_NA_FOR_CLAVES.get(column)
+    if na_claves is not None and record.clave_documento.upper() in {c.upper() for c in na_claves}:
+        return True
+
     operation_type = _as_text(record.tipo_operacion).casefold()
     document_key = record.clave_documento.upper()
     operation_rules = DOCUMENTS_NOT_APPLICABLE_BY_COLUMN.get(column, {})
@@ -59,6 +81,11 @@ def _is_not_applicable(record: DataRecord, column: str) -> bool:
             configured_keys = {key.upper() for key in document_keys}
             return "*" in configured_keys or document_key in configured_keys
     return False
+
+
+def _document_patterns(record: DataRecord, column: str, default_pattern: str) -> list[str]:
+    patent_patterns = DOCUMENT_PATTERNS_BY_PATENT.get(record.patente, {}).get(column, set())
+    return [default_pattern, *sorted(patent_patterns)]
 
 
 def _is_supported_excel(path: Path) -> bool:
@@ -194,6 +221,7 @@ def generate_result_file(
     _append_to_ds(workbook[DS_SHEET_NAME], analysis.records)
     indexed_names = build_file_index(expedients_folder) if expedients_folder else []
     document_counts = _create_month_sheet(workbook, month, analysis.records, indexed_names)
+    _create_percentages_sheet(workbook)
     _order_sheets(workbook, month)
 
     try:
@@ -308,32 +336,69 @@ def _create_month_sheet(
             group_row = sheet.max_row
             sheet.merge_cells(start_row=group_row, start_column=1, end_row=group_row, end_column=len(MONTHLY_COLUMNS))
             group_cell = sheet.cell(group_row, 1)
-            group_cell.fill = PatternFill("solid", fgColor="172033")
-            group_cell.font = Font(color="67E8F9", bold=True)
+            group_cell.fill = PatternFill("solid", fgColor="8DC63F")
+            group_cell.font = Font(color="2D2926", bold=True)
             group_cell.alignment = Alignment(horizontal="left", vertical="center")
 
         document_values = {column: "" for column in DOCUMENT_RULES}
         for column in MONTHLY_COLUMNS:
             if _is_not_applicable(record, column):
                 document_values[column] = "NA"
+        if all(document_values.get(col) == "NA" for col in ACUSE_DEPENDENT_COLUMNS):
+            document_values["ACUSE"] = "NA"
         missing_documents: list[str] = []
         comments = "Pendiente de validacion documental"
         if indexed_names:
             for column, rule in DOCUMENT_RULES.items():
                 if document_values.get(column) == "NA":
                     continue
-                pattern = rule["pattern"]
+                patterns = _document_patterns(record, column, rule["pattern"])
                 extension = rule["extension"]
-                if has_document(record, indexed_names, pattern, extension):
+
+                if column == "Comprobante incrementables":
+                    found_path = ""
+                    for p in patterns:
+                        found_path = find_document_path(record, indexed_names, p, extension)
+                        if found_path:
+                            break
+                    if found_path:
+                        document_counts[column]["found"] += 1
+                        document_values[column] = found_path
+                    else:
+                        document_counts[column]["missing"] += 1
+                        document_values[column] = "✗"
+                        missing_documents.append(f"Comprobante incrementables: {' / '.join(patterns)}")
+                    continue
+
+                found = any(has_document(record, indexed_names, pattern, extension) for pattern in patterns)
+                if not found and column == "XMLPD":
+                    found = has_document_by_llave(record, indexed_names, extension)
+                if not found and column in DOCUMENT_PREFIX_FALLBACKS:
+                    fb = DOCUMENT_PREFIX_FALLBACKS[column]
+                    found = has_document_by_prefix(record, indexed_names, fb["prefix"], fb["extension"])
+                if found:
                     document_counts[column]["found"] += 1
-                    document_values[column] = "a"
+                    document_values[column] = "✔"
                 else:
                     document_counts[column]["missing"] += 1
-                    document_values[column] = "x"
-                    missing_documents.append(f"{column}: {pattern}{extension}")
+                    document_values[column] = "✗"
+                    missing_documents.append(f"{column}: {' / '.join(patterns)}{extension}")
             if missing_documents:
                 comments = "Falta " + ", ".join(missing_documents)
 
+        payment_validation_value = ""
+        if indexed_names:
+            patent_payment_rules = PAYMENT_VALIDATION_FILES.get(record.patente, [])
+            if patent_payment_rules:
+                missing_pv = missing_payment_validation_files(record, indexed_names, patent_payment_rules)
+                if missing_pv:
+                    payment_validation_value = "✗"
+                    pv_comment = "PAGO falta: " + ", ".join(missing_pv)
+                    comments = pv_comment if comments == "Pendiente de validacion documental" else comments + "; " + pv_comment
+                else:
+                    payment_validation_value = "✔"
+
+        estatus = _compute_estatus(document_values, payment_validation_value)
         sheet.append(
             [
                 record.llave,
@@ -347,18 +412,18 @@ def _create_month_sheet(
                 document_values["ACUSE COVE"],
                 document_values["XML COVE"],
                 document_values["FACTURA"],
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
+                document_values.get("RNNAS", ""),
+                document_values.get("ESCRITOS", ""),
+                document_values.get("ORIGEN", ""),
+                document_values.get("DOC DE TRANSPORTE", ""),
+                document_values.get("FACTURAS", ""),
+                document_values.get("OTROS DOC", ""),
+                document_values.get("ACUSE", ""),
                 document_values.get("HC", ""),
                 document_values.get("MV", ""),
-                "",
+                payment_validation_value,
                 document_values.get("Comprobante incrementables", ""),
-                "PENDIENTE",
+                estatus,
                 comments,
             ]
         )
@@ -370,7 +435,7 @@ def _create_month_sheet(
 
 
 def _style_header(sheet, row: int, columns: int) -> None:
-    fill = PatternFill("solid", fgColor="1F2937")
+    fill = PatternFill("solid", fgColor="2D2926")
     font = Font(color="FFFFFF", bold=True)
     alignment = Alignment(horizontal="center", vertical="center")
     for col in range(1, columns + 1):
@@ -391,8 +456,77 @@ def _resize_columns(sheet) -> None:
         sheet.column_dimensions[letter].width = min(max(max_length + 2, 12), 45)
 
 
+def _create_percentages_sheet(workbook: Workbook) -> None:
+    if PERCENTAGES_SHEET_NAME in workbook.sheetnames:
+        workbook.remove(workbook[PERCENTAGES_SHEET_NAME])
+
+    sheet = workbook.create_sheet(PERCENTAGES_SHEET_NAME)
+    sheet.append(PERCENTAGES_COLUMNS)
+    _style_header(sheet, 1, len(PERCENTAGES_COLUMNS))
+
+    estatus_col_letter = get_column_letter(MONTHLY_COLUMNS.index("ESTATUS") + 1)
+    present_months = [mes for mes in MONTHS if mes in workbook.sheetnames]
+
+    row_fill = PatternFill("solid", fgColor="2D2926")
+    row_font = Font(color="FFFFFF")
+    row_align = Alignment(horizontal="center", vertical="center")
+
+    for i, mes in enumerate(present_months):
+        r = i + 2
+        col_ref = f"'{mes}'!${estatus_col_letter}:${estatus_col_letter}"
+        sheet.cell(r, 1).value = mes
+        sheet.cell(r, 2).value = f'=COUNTIF({col_ref},"COMPLETO")+COUNTIF({col_ref},"PENDIENTE")'
+        sheet.cell(r, 3).value = f'=COUNTIF({col_ref},"COMPLETO")'
+        sheet.cell(r, 4).value = f'=COUNTIF({col_ref},"PENDIENTE")'
+        sheet.cell(r, 5).value = f"=IF(B{r}>0,C{r}/B{r}*100,0)"
+        for col in range(1, 6):
+            cell = sheet.cell(r, col)
+            cell.fill = row_fill
+            cell.font = row_font
+            cell.alignment = row_align
+        sheet.cell(r, 5).number_format = '0.00"%"'
+
+    if not present_months:
+        return
+
+    last_data_row = len(present_months) + 1
+    tr = last_data_row + 1
+    sheet.cell(tr, 1).value = "TOTAL"
+    sheet.cell(tr, 2).value = f"=SUM(B2:B{last_data_row})"
+    sheet.cell(tr, 3).value = f"=SUM(C2:C{last_data_row})"
+    sheet.cell(tr, 4).value = f"=SUM(D2:D{last_data_row})"
+    sheet.cell(tr, 5).value = f"=IF(B{tr}>0,C{tr}/B{tr}*100,0)"
+    total_fill = PatternFill("solid", fgColor="8DC63F")
+    total_font = Font(color="2D2926", bold=True)
+    for col in range(1, 6):
+        cell = sheet.cell(tr, col)
+        cell.fill = total_fill
+        cell.font = total_font
+        cell.alignment = row_align
+    sheet.cell(tr, 5).number_format = '0.00"%"'
+
+    _resize_columns(sheet)
+
+
+def _compute_estatus(document_values: dict, payment_validation_value: str) -> str:
+    for col, val in document_values.items():
+        if col == "Comprobante incrementables":
+            if val in ("✗", ""):
+                return "PENDIENTE"
+        else:
+            if val not in ("✔", "NA"):
+                return "PENDIENTE"
+    if payment_validation_value == "✗":
+        return "PENDIENTE"
+    return "COMPLETO"
+
+
 def _order_sheets(workbook: Workbook, month: str) -> None:
     if DS_SHEET_NAME in workbook.sheetnames:
         ds_sheet = workbook[DS_SHEET_NAME]
         workbook._sheets.remove(ds_sheet)
         workbook._sheets.insert(0, ds_sheet)
+    if PERCENTAGES_SHEET_NAME in workbook.sheetnames:
+        perc_sheet = workbook[PERCENTAGES_SHEET_NAME]
+        workbook._sheets.remove(perc_sheet)
+        workbook._sheets.insert(1, perc_sheet)

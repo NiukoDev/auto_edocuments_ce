@@ -12,6 +12,13 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QFrame, QSizePolicy,
 )
 
+
+class _WideComboBox(QComboBox):
+    """ComboBox cuyo popup nunca es más angosto que el propio widget."""
+    def showPopup(self) -> None:
+        self.view().setMinimumWidth(self.width())
+        super().showPopup()
+
 from config import APP_NAME, DATA_SHEET_NAME, MONTHS
 from excel_service import (
     ExcelValidationError, analyze_data_file, generate_result_file,
@@ -19,19 +26,18 @@ from excel_service import (
 )
 from models import AnalysisResult
 
-# ── Paleta ────────────────────────────────────────────────────────────────────
-BG     = "#0b1120"
-CARD   = "#111827"
-PANEL  = "#172033"
-FIELD  = "#020617"
-TEXT   = "#e5f0ff"
-MUTED  = "#94a3b8"
-FG_LBL = "#cbd5e1"
-CYAN   = "#67e8f9"
-BLUE   = "#2563eb"
-ACCENT = "#0891b2"
-NEUTRAL= "#1f2937"
-BORDER = "#334155"
+# ── Paleta Niuko ─────────────────────────────────────────────────────────────
+BG     = "#1C1A17"
+CARD   = "#252320"
+PANEL  = "#2D2926"
+FIELD  = "#0F0E0C"
+TEXT   = "#F4F3EF"
+MUTED  = "#9B9B91"
+FG_LBL = "#CECCC3"
+GREEN  = "#8DC63F"
+GREEN_D= "#6B9A2E"
+NEUTRAL= "#3A3731"
+BORDER = "#4A4840"
 
 STYLESHEET = f"""
 /* ── Base ── */
@@ -50,18 +56,27 @@ QLabel {{ background: transparent; color: {FG_LBL}; }}
 QComboBox {{
     background: {FIELD}; color: {TEXT};
     border: 1px solid {BORDER}; border-radius: 4px;
-    padding: 5px 10px; font-size: 11px; font-weight: bold;
+    padding: 6px 12px; font-size: 13px; font-weight: bold;
 }}
-QComboBox:hover {{ border-color: {CYAN}; }}
-QComboBox::drop-down {{ border: none; width: 24px; }}
+QComboBox:hover {{ border-color: {GREEN}; }}
+QComboBox::drop-down {{ border: none; width: 28px; }}
 QComboBox::down-arrow {{
-    border-left: 4px solid transparent; border-right: 4px solid transparent;
-    border-top: 5px solid {MUTED}; width: 0; height: 0; margin-right: 8px;
+    border-left: 5px solid transparent; border-right: 5px solid transparent;
+    border-top: 6px solid {MUTED}; width: 0; height: 0; margin-right: 10px;
 }}
 QComboBox QAbstractItemView {{
     background: {FIELD}; color: {TEXT};
-    selection-background-color: {NEUTRAL};
-    border: 1px solid {BORDER}; outline: none; padding: 2px;
+    selection-background-color: {GREEN_D};
+    selection-color: white;
+    border: 1px solid {GREEN}; border-radius: 4px;
+    outline: none; padding: 4px;
+    font-size: 13px;
+}}
+QComboBox QAbstractItemView::item {{
+    padding: 10px 16px; min-height: 36px;
+}}
+QComboBox QAbstractItemView::item:selected {{
+    background: {GREEN_D}; color: white;
 }}
 
 /* ── Buttons ── */
@@ -70,11 +85,11 @@ QPushButton {{
     padding: 5px 14px; font-weight: bold; font-size: 11px;
 }}
 QPushButton#neutral  {{ background: {NEUTRAL}; color: {TEXT}; }}
-QPushButton#neutral:hover  {{ background: #374151; }}
-QPushButton#blue     {{ background: {BLUE}; color: white; }}
-QPushButton#blue:hover     {{ background: #1d4ed8; }}
-QPushButton#accent   {{ background: {ACCENT}; color: white; }}
-QPushButton#accent:hover   {{ background: #0e7490; }}
+QPushButton#neutral:hover  {{ background: {PANEL}; }}
+QPushButton#blue     {{ background: {GREEN}; color: {PANEL}; }}
+QPushButton#blue:hover     {{ background: {GREEN_D}; color: white; }}
+QPushButton#accent   {{ background: {GREEN_D}; color: white; }}
+QPushButton#accent:hover   {{ background: #578520; }}
 
 /* ── Checkbox ── */
 QCheckBox {{ color: {FG_LBL}; font-size: 11px; spacing: 8px; }}
@@ -82,11 +97,11 @@ QCheckBox::indicator {{
     width: 15px; height: 15px;
     background: {FIELD}; border: 1px solid {BORDER}; border-radius: 3px;
 }}
-QCheckBox::indicator:checked {{ background: {ACCENT}; border-color: {ACCENT}; }}
+QCheckBox::indicator:checked {{ background: {GREEN}; border-color: {GREEN}; }}
 
 /* ── Log text ── */
 QTextEdit {{
-    background: {FIELD}; color: #dbeafe;
+    background: {FIELD}; color: {FG_LBL};
     border: none;
     font-family: Menlo, Monaco, "Courier New", monospace;
     font-size: 10px; padding: 6px;
@@ -102,7 +117,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
 
 # ── Path label estilos ────────────────────────────────────────────────────────
 _PATH_DEFAULT = f"background:{FIELD}; color:{MUTED}; font-size:11px; padding:5px 8px; border:1px solid {BORDER}; border-radius:4px;"
-_PATH_ACTIVE  = f"background:{FIELD}; color:{TEXT};  font-size:11px; padding:5px 8px; border:1px solid {ACCENT}; border-radius:4px;"
+_PATH_ACTIVE  = f"background:{FIELD}; color:{TEXT};  font-size:11px; padding:5px 8px; border:1px solid {GREEN}; border-radius:4px;"
 
 
 class AuditorApp(QMainWindow):
@@ -164,14 +179,14 @@ class AuditorApp(QMainWindow):
 
     def _header(self) -> QFrame:
         h = QFrame()
-        h.setStyleSheet(f"background: {BLUE};")
+        h.setStyleSheet(f"background: {PANEL};")
         hl = QVBoxLayout(h)
         hl.setContentsMargins(22, 14, 22, 14)
         hl.setSpacing(3)
         t = QLabel(APP_NAME)
-        t.setStyleSheet("color: white; font-size: 20px; font-weight: bold;")
-        s = QLabel("Genera DS acumulada y hojas mensuales estrictas desde el DATA oficial.")
-        s.setStyleSheet("color: #bfdbfe; font-size: 11px;")
+        t.setStyleSheet(f"color: {GREEN}; font-size: 20px; font-weight: bold;")
+        s = QLabel("Niuko Consultoría Legal & Fiscal  —  Auditor de Expedientes Aduaneros")
+        s.setStyleSheet(f"color: {MUTED}; font-size: 11px;")
         hl.addWidget(t)
         hl.addWidget(s)
         return h
@@ -191,7 +206,7 @@ class AuditorApp(QMainWindow):
 
         # Modo
         cl.addWidget(self._section("Modo de operación"))
-        self.mode_combo = QComboBox()
+        self.mode_combo = _WideComboBox()
         self.mode_combo.addItems(["Crear archivo nuevo", "Actualizar archivo existente"])
         self.mode_combo.currentTextChanged.connect(self._refresh_output_label)
         cl.addWidget(self.mode_combo)
@@ -233,7 +248,7 @@ class AuditorApp(QMainWindow):
         ml.setContentsMargins(0, 0, 0, 0)
         ml.setSpacing(4)
         ml.addWidget(self._section("Mes"))
-        self.month_combo = QComboBox()
+        self.month_combo = _WideComboBox()
         self.month_combo.addItems(MONTHS)
         self.month_combo.setCurrentIndex(datetime.now().month - 1)
         ml.addWidget(self.month_combo)
@@ -244,7 +259,7 @@ class AuditorApp(QMainWindow):
         yl.setContentsMargins(0, 0, 0, 0)
         yl.setSpacing(4)
         yl.addWidget(self._section("Año"))
-        self.year_combo = QComboBox()
+        self.year_combo = _WideComboBox()
         self.year_combo.addItems([str(datetime.now().year + i) for i in range(-2, 4)])
         self.year_combo.setCurrentText(str(datetime.now().year))
         yl.addWidget(self.year_combo)
@@ -261,7 +276,7 @@ class AuditorApp(QMainWindow):
         il.setContentsMargins(12, 10, 12, 10)
         il.setSpacing(4)
         t1 = QLabel(f'El DATA debe tener una hoja llamada exactamente "{DATA_SHEET_NAME}".')
-        t1.setStyleSheet(f"color: {CYAN}; font-weight: bold; font-size: 11px;")
+        t1.setStyleSheet(f"color: {GREEN}; font-weight: bold; font-size: 11px;")
         t1.setWordWrap(True)
         t2 = QLabel("Columnas: Patente, Pedimento, SeccionAduanera, TipoOperacion, ClaveDocumento, FechaPagoReal.")
         t2.setStyleSheet(f"color: {FG_LBL}; font-size: 10px;")
