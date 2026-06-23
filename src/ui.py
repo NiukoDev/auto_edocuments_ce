@@ -260,7 +260,7 @@ class AuditorApp(QMainWindow):
         yl.setSpacing(4)
         yl.addWidget(self._section("Año"))
         self.year_combo = _WideComboBox()
-        self.year_combo.addItems([str(datetime.now().year + i) for i in range(-2, 4)])
+        self.year_combo.addItems([str(datetime.now().year + i) for i in range(-5, 6)])
         self.year_combo.setCurrentText(str(datetime.now().year))
         yl.addWidget(self.year_combo)
 
